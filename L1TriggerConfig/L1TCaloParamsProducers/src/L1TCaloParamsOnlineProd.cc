@@ -49,6 +49,90 @@ readCaloLayer1OnlineSettings(l1t::CaloParamsHelper& paramsHelper, std::map<std::
   return true;
 }
 
+bool
+readCaloLayer2OnlineSettings(l1t::CaloParamsHelper& paramsHelper, std::map<std::string, l1t::setting>& conf, std::map<std::string, l1t::mask>& ) {
+  const char * expectedParams[] = {
+    "leptonSeedThreshold",
+    "leptonTowerThreshold",
+    "pileUpTowerThreshold",
+    "jetSeedThreshold",
+    "jetMaxEta",
+    "HTMHT_maxJetEta",
+    "HT_jetThreshold",
+    "MHT_jetThreshold",
+    "jetEnergyCalibLUT",
+    "ETMET_maxTowerEta",
+    "ET_energyCalibLUT",
+    "ecalET_energyCalibLUT",
+    "METX_energyCalibLUT",
+    "METY_energyCalibLUT",
+    "egammaRelaxationThreshold",
+    "egammaMaxEta",
+    "egammaEnergyCalibLUT",
+    "egammaIsoLUT",
+    "tauMaxEta",
+    "tauEnergyCalibLUT",
+    "tauIsoLUT1",
+    "tauIsoLUT2"
+  };
+  for (const auto param : expectedParams) {
+    if ( conf.find(param) == conf.end() ) {
+      std::cerr << "Unable to locate expected CaloLayer2 parameter: " << param << " in L1 settings payload!";
+      return false;
+    }
+  }
+  // Layer 2 params specification
+  paramsHelper.setEgSeedThreshold((conf["leptonSeedThreshold"].getValue<int>()));
+  paramsHelper.setTauSeedThreshold((conf["leptonSeedThreshold"].getValue<int>()));
+  paramsHelper.setEgNeighbourThreshold((conf["leptonTowerThreshold"].getValue<int>()));
+  paramsHelper.setTauNeighbourThreshold((conf["leptonTowerThreshold"].getValue<int>()));
+  paramsHelper.setJetSeedThreshold((conf["jetSeedThreshold"].getValue<int>()));
+
+  // Currently not used // paramsHelper.setEgPileupTowerThresh((conf["pileUpTowerThreshold"].getValue<int>())); 
+  // Currently not used // paramsHelper.setTauPileupTowerThresh((conf["pileUpTowerThreshold"].getValue<int>())); 
+  // Currently not used // paramsHelper.setJetMaxEta((conf["jetMaxEta"].getValue<int>()));
+  
+  std::vector<int> etSumEtaMax[4];
+  std::vector<int> etSumEtThresh[4];
+  
+  etSumEtaMax.push_back(conf["ETMET_maxTowerEta"].getValue<int>());
+  etSumEtaMax.push_back(conf["HTMHT_maxJetEta"].getValue<int>());
+  etSumEtaMax.push_back(conf["ETMET_maxTowerEta"].getValue<int>());
+  etSumEtaMax.push_back(conf["HTMHT_maxJetEta"].getValue<int>());
+  
+  etSumEtThresh.push_back(0); // ETT tower threshold
+  etSumEtThresh.push_back(conf["HT_jetThreshold"].getValue<int>());
+  etSumEtThresh.push_back(0); // ETM tower threshold
+  etSumEtThresh.push_back(conf["MHT_jetThreshold"].getValue<int>());
+
+  for (uint i=0; i<4; ++i) {
+    paramsHelper.setEtSumEtaMax(i, etSumEtaMax.at(i));
+    paramsHelper.setEtSumEtThreshold(i, etSumEtThresh.at(i));
+  }
+
+  paramsHelper.setJetCalibrationLUT((conf["jetEnergyCalibLUT"].getVector<int>()));
+  paramsHelper.setEtSumEttPUSLUT((conf["ET_energyCalibLUT"].getVector<int>()));
+  paramsHelper.setEtSumEcalSumPUTLUT((conf["ecalET_energyCalibLut"].getVector<int>()));
+  paramsHelper.setEtSumXPUSLUT((conf["METX_energyCalibLUT"].getVector<int>()));
+  paramsHelper.setEtSumYPUSLUT((conf["METY_energyCalibLUT"].getVector<int>()));
+  paramsHelper.setEgMaxPtHOverE((conf["egammaRelaxationThreshold"].getValue<int>()));
+  paramsHelper.setEgEtaCut((conf["egammaMaxEta"].getValue<int>()));
+  paramsHelper.setEgCalibrationLUT((conf["egammaEnergyCalibLUT"].getVector<int>()));
+  paramsHelper.setEgIsolationLUT((conf["egammaIsoLUT"].getVector<int>()));
+  paramsHelper.setIsoTauEtaMax((conf["tauMaxEta"].getValue<int>()));
+  paramsHelper.setTauCalibrationLUT((conf["tauEnergyCalibLUT"].getVector<int>()));
+  paramsHelper.setTauIsolationLUT((conf["tauIsoLUT1"].getVector<int>()));
+  paramsHelper.setTauIsolationLUT2((conf["tauIsoLUT2"].getVector<int>()));
+
+  paramsHelper.setLayer1HCalScaleFactors((conf["layer1HCalScaleFactors"].getVector<double>()));
+  paramsHelper.setLayer1HFScaleFactors  ((conf["layer1HFScaleFactors"]  .getVector<double>()));
+  paramsHelper.setLayer1ECalScaleETBins(conf["layer1ECalScaleETBins"].getVector<int>());
+  paramsHelper.setLayer1HCalScaleETBins(conf["layer1HCalScaleETBins"].getVector<int>());
+  paramsHelper.setLayer1HFScaleETBins  (conf["layer1HFScaleETBins"]  .getVector<int>());
+
+  return true;
+}
+
 L1TCaloParamsOnlineProd::L1TCaloParamsOnlineProd(const edm::ParameterSet& iConfig) : L1ConfigOnlineProdBaseExt<L1TCaloParamsO2ORcd,l1t::CaloParams>(iConfig) {}
 
 boost::shared_ptr<l1t::CaloParams> L1TCaloParamsOnlineProd::newObject(const std::string& objectKey, const L1TCaloParamsO2ORcd& record) {
@@ -334,18 +418,19 @@ boost::shared_ptr<l1t::CaloParams> L1TCaloParamsOnlineProd::newObject(const std:
     std::map<std::string, l1t::setting> calol1_conf = calol1.getSettings("processors");
     std::map<std::string, l1t::mask>    calol1_rs   ;//= calol1.getMasks   ("processors");
 
-//    Do nothing for the Calo Layer2
-//    l1t::trigSystem calol2;
-//    calol2.addProcRole("processors", "processors");
-//    xmlReader.readRootElement( calol2, "calol2" );
-//    calol2.setConfigured();
-//    // Perhaps layer 2 has to look at settings for demux and mp separately?
-//    std::map<string, l1t::setting> calol2_conf = calol2.getSettings("processors");
-//    std::map<string, l1t::mask>    calol2_rs   = calol2.getMasks   ("processors");
 
+    l1t::trigSystem calol2;
+    calol2.addProcRole("processors", "processors");
+    xmlReader.readRootElement( calol2, "calol2" );
+    calol2.setConfigured();
+    // Perhaps layer 2 has to look at settings for demux and mp separately? // => No demux settings required
+    std::map<string, l1t::setting> calol2_conf = calol2.getSettings("processors");
+    std::map<string, l1t::mask>    calol2_rs   = calol2.getMasks   ("processors");
+    
     l1t::CaloParamsHelper m_params_helper(*(baseSettings.product()));
 
     readCaloLayer1OnlineSettings(m_params_helper, calol1_conf, calol1_rs);
+    readCaloLayer2OnlineSettings(m_params_helper, calol2_conf, calol2_rs);
 
     return boost::shared_ptr< l1t::CaloParams >( new l1t::CaloParams ( m_params_helper ) ) ;
 }
